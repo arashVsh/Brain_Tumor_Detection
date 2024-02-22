@@ -1,132 +1,62 @@
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset
 import os
 from PIL import Image
-import numpy as np
-from MergeData import mergeDatasets
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Subset
+from CustomDataset import MyCustomDataset
 
 ROOT_TRAIN_PATH = "C:/Projects/Big-Files/brain_tumor_dataset/train/"
 ROOT_TEST_PATH = "C:/Projects/Big-Files/brain_tumor_dataset/test/"
 
 
-def loadTest():
-    yes_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TEST_PATH + "yes"
-    )
-    no_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TEST_PATH + "no"
-    )
+def mergeDatasets(datasets: list[Dataset], stringLabels: list[str], training: bool):
+    images = []
+    labels: list[int] = []
 
-    total_train_loader = mergeDatasets(
-        [yes_loader.dataset, no_loader.dataset],
-        ["y", "n"],
-        training=False,
-    )
-    return total_train_loader
+    for index in range(len(datasets)):
+        if stringLabels[index].lower() == "y" or stringLabels[index].lower() == "yes":
+            for element in datasets[index]:
+                images.append(element[0])
+                labels.append(1)
+        else:
+            for element in datasets[index]:
+                image = element[0]
+                # if image.shape[0] > 3:
+                #     print('yes')
+                #     image = image.unsqueeze(0)
+                # else:
+                #     print('no')
+                images.append(image)
+                labels.append(0)
 
-
-def loadOnlyOriginalTrain():
-    original_yes_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "original/yes"
-    )
-    original_no_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "original/no"
-    )
-
-    total_train_loader = mergeDatasets(
-        [original_yes_loader.dataset, original_no_loader.dataset],
-        ["y", "n"],
-        training=True,
-    )
-    return total_train_loader
+    combined_dataset = MyCustomDataset(images, labels)
+    combined_loader = DataLoader(combined_dataset, batch_size=16, shuffle=training)
+    return combined_loader
 
 
-def loadOnlyGeneratedTrain():
-    generated_yes_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "generated/yes"
-    )
-    generated_no_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "generated/no"
-    )
-    total_train_loader = mergeDatasets(
-        [generated_yes_loader.dataset, generated_no_loader.dataset],
-        ["y", "n"],
-        training=True,
-    )
-    return total_train_loader
-
-
-def loadOriginalAndGeneratedTrain():
-    original_yes_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "original/yes"
-    )
-    original_no_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "original/no"
-    )
-    generated_yes_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "generated/yes"
-    )
-    generated_no_loader: DataLoader = loadDataFromFolder(
-        folder_path=ROOT_TRAIN_PATH + "generated/no"
-    )
-    total_train_loader = mergeDatasets(
-        [
-            original_yes_loader.dataset,
-            original_no_loader.dataset,
-            generated_yes_loader.dataset,
-            generated_no_loader.dataset,
-        ],
-        ["y", "n", "y", "n"],
-        training=True,
-    )
-    return total_train_loader
-
-
-def saveData(numpy_array, folder_path):
-    # Create the folder if it doesn't exist
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-    else:
-        # If the folder exists, delete its contents
-        file_list = os.listdir(folder_path)
-        for file_name in file_list:
-            file_path = os.path.join(folder_path, file_name)
-            os.remove(file_path)
-
-    # Iterate over the images in the NumPy array
-    for i, image_array in enumerate(numpy_array):
-        # Convert the NumPy array to PIL Image
-        image = Image.fromarray(
-            np.uint8(image_array.squeeze() * 255), mode="L"
-        )  # Assuming pixel values are in [0, 1] range
-
-        # Save the image to the folder in JPEG format
-        image_path = os.path.join(folder_path, f"image_{i}.jpg")
-        image.save(image_path)
-
-    print(f"Saved {len(numpy_array)} images to {folder_path}")
-
-
-def loadDataFromFolder(folder_path):
+def load_and_partition_samples(folder_path):
     # Define transformations (e.g., converting images to tensors)
     transform = transforms.Compose(
-        [
-            transforms.Resize((256, 256)),  # Resize images to 256x256
-            transforms.Grayscale(),  # Convert images to grayscale
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
-        ]
+        [transforms.Resize((160, 160)), transforms.Grayscale(), transforms.ToTensor()]
     )
 
     dataset = ImageFolderDataset(folder_path, transform=transform)
+    partition_index = len(dataset) // 4
 
-    # Create DataLoader with shuffling enabled
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+    subset1_indices = range(0, partition_index)
+    subset1 = Subset(dataset, subset1_indices)
 
-    # Iterate over DataLoader to access batches of shuffled images
-    # for batch in dataloader:
-    #     # Process each batch as needed
-    #     print(batch.shape)  # Example: printing the shape of the batch
-    return dataloader
+    subset2_indices = range(partition_index, 2 * partition_index)
+    subset2 = Subset(dataset, subset2_indices)
+
+    subset3_indices = range(2 * partition_index, 3 * partition_index + 1)
+    subset3 = Subset(dataset, subset3_indices)
+
+    subset4_indices = range(3 * partition_index + 1, len(dataset))
+    subset4 = Subset(dataset, subset4_indices)
+
+    return subset1, subset2, subset3, subset4
 
 
 # Custom dataset class to load images from a folder
@@ -134,8 +64,7 @@ class ImageFolderDataset(Dataset):
     def __init__(self, folder_path, transform=None):
         self.folder_path = folder_path
         self.image_paths = [
-            os.path.join(folder_path, filename)
-            for filename in os.listdir(folder_path)
+            os.path.join(folder_path, filename) for filename in os.listdir(folder_path)
         ]
         self.transform = transform
 

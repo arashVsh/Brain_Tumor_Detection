@@ -5,6 +5,9 @@ import torch
 def showImages(image_list, title):
     if type(image_list) is torch.Tensor:
         image_list = image_list.detach().cpu().numpy()
+    if type(image_list) is list:
+        image_list = np.array(image_list)
+
     if image_list.shape[1] == 1:
         # Reshape the array to (758, 128, 128)
         image_list = np.squeeze(image_list, axis=1)

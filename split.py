@@ -56,10 +56,10 @@ def main():
     os.makedirs(test_folder, exist_ok=True)
 
     # Split "yes" images
-    split_dataset(os.path.join(dataset_folder, "yes"), train_folder, test_folder, split_ratio=0.75)
+    split_dataset(os.path.join(dataset_folder, "yes"), train_folder, test_folder, split_ratio=0.6)
 
     # Split "no" images
-    split_dataset(os.path.join(dataset_folder, "no"), train_folder, test_folder, split_ratio=0.75)
+    split_dataset(os.path.join(dataset_folder, "no"), train_folder, test_folder, split_ratio=0.6)
 
     print("Dataset split completed successfully.")
 
