@@ -180,7 +180,7 @@ class CustomResNetWithSelfAttention(nn.Module):
         return x
 
 
-def trainModel(
+def trainResNet(
     model,
     train_loader,
     criterion,
@@ -238,7 +238,7 @@ def trainModel(
     plt.show()
 
 
-def evaluateModel(model, test_loader, criterion, device="cuda"):
+def evaluateResNet(model, test_loader, criterion, device="cuda"):
     model.to(device)
     model.eval()
     correct = 0
@@ -275,3 +275,24 @@ def evaluateModel(model, test_loader, criterion, device="cuda"):
     print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%")
     print("Class-wise Accuracy:", class_accuracy)
     return test_loss, test_acc, class_accuracy
+
+
+
+
+import torch
+from torchviz import make_dot
+
+# Create an instance of CustomResNetWithSelfAttention
+model = CustomResNetWithSelfAttention(num_classes=2)  # Assuming you have 2 classes for binary classification
+
+# Create a dummy input tensor
+dummy_input = torch.randn(1, 1, 160, 160)  # Assuming input size of (N, C, H, W)
+
+# Forward pass
+output = model(dummy_input)
+
+# Visualize the model architecture
+# make_dot(output, params=dict(model.named_parameters()))
+dot = make_dot(output, params=dict(model.named_parameters()))
+dot.format = 'png'
+dot.render(filename='resnet_with_self_attention_architecture', directory='./', cleanup=True)
